@@ -5,10 +5,8 @@ import os
 import textwrap
 import tempfile
 from dotenv import load_dotenv
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-import time
+import requests
+from bs4 import BeautifulSoup
 
 from langchain_community.llms import Together
 from langchain.chains import ConversationalRetrievalChain
@@ -69,20 +67,15 @@ def load_and_chunk(file):
     chunks = textwrap.wrap(text, width=500, break_long_words=False)
     return chunks
 
-# 🔧 Web scraping using Selenium
+# 🔧 Web scraping using BeautifulSoup (static only)
 def scrape_and_chunk(url):
     try:
-        chrome_options = Options()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--no-sandbox')
-        driver = webdriver.Chrome(options=chrome_options)
-
-        driver.get(url)
-        time.sleep(5)
-        text = driver.find_element(By.TAG_NAME, "body").text
-        driver.quit()
-
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
+        text = soup.get_text(separator=" ", strip=True)
         chunks = textwrap.wrap(text, width=500, break_long_words=False)
         return chunks
     except Exception as e:
