@@ -8,6 +8,7 @@
         rm -rf /var/lib/apt/lists/*
     
     # ---- Environment variables ----
+    ENV STREAMLIT_SERVER_HEADLESS=true
     ENV CHROME_BIN=/usr/bin/chromium
     ENV PATH="/usr/lib/chromium:$PATH"
     
