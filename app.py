@@ -7,6 +7,7 @@ import tempfile
 from dotenv import load_dotenv
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 
 from langchain_community.llms import Together
 from langchain.chains import ConversationalRetrievalChain
@@ -46,7 +47,7 @@ st.set_page_config(page_title="AskDoc – Conversational RAG", layout="wide")
 st.title("📘 AskDoc – Smart Conversational Q&A")
 
 uploaded_file = st.file_uploader("Upload a PDF or TXT file", type=["pdf", "txt"])
-webpage_url = st.text_input("🌐 Or enter a website URL to extract content")
+webpage_urls = st.text_area("🌐 Or enter website URL(s) (one per line)")
 question = st.text_input("💬 Ask something about the content")
 submit = st.button("🔍 Ask")
 
@@ -73,14 +74,14 @@ def scrape_and_chunk(url):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url.strip(), headers=headers, timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
         text = soup.get_text(separator=" ", strip=True)
         chunks = textwrap.wrap(text, width=500, break_long_words=False)
-        return chunks
+        return text, chunks
     except Exception as e:
-        st.error(f"❌ Failed to fetch content: {e}")
-        return []
+        st.error(f"❌ Failed to fetch {url}: {e}")
+        return "", []
 
 # 🔍 Vectorstore from chunks
 def create_vectorstore(chunks):
@@ -114,15 +115,25 @@ if "qa_chain" not in st.session_state:
     st.session_state.qa_chain = None
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
+if "scraped_data" not in st.session_state:
+    st.session_state.scraped_data = []
 
-# 📥 File or URL processing
+# 📥 File or URLs processing
 chunks = []
+
 if uploaded_file:
     chunks = load_and_chunk(uploaded_file)
     st.success(f"✅ Indexed {len(chunks)} chunks from uploaded file.")
-elif webpage_url:
-    chunks = scrape_and_chunk(webpage_url)
-    st.success(f"✅ Indexed {len(chunks)} chunks from webpage.")
+
+elif webpage_urls:
+    urls = webpage_urls.strip().split("\n")
+    for url in urls:
+        if url.strip():
+            text, chunked = scrape_and_chunk(url)
+            if text:
+                st.session_state.scraped_data.append({"url": url.strip(), "text": text})
+                chunks += chunked
+    st.success(f"✅ Indexed {len(chunks)} chunks from {len(urls)} webpage(s).")
 
 if chunks:
     vectordb = create_vectorstore(chunks)
@@ -132,9 +143,20 @@ if chunks:
 # 🧾 Ask Question
 if submit and question:
     if not st.session_state.qa_chain:
-        st.warning("⚠️ Please upload a document or enter a valid URL first.")
+        st.warning("⚠️ Please upload a document or enter valid URLs first.")
     else:
         with st.spinner("🤖 Thinking..."):
             answer = st.session_state.qa_chain.run(question)
         st.subheader("🟢 Answer:")
         st.markdown(f"> {answer}")
+
+# 📥 Download scraped content
+if st.session_state.scraped_data:
+    df = pd.DataFrame(st.session_state.scraped_data)
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download scraped data as CSV",
+        data=csv,
+        file_name='scraped_data.csv',
+        mime='text/csv'
+    )
