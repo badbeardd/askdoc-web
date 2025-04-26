@@ -86,7 +86,9 @@ def scrape_and_chunk(url):
 # 🔍 Vectorstore from chunks
 def create_vectorstore(chunks):
     documents = [Document(page_content=chunk) for chunk in chunks]
-    embedding_model = HuggingFaceEmbeddings(model_name="intfloat/e5-large-v2")
+    embedding_model = HuggingFaceEmbeddings(
+    model_name="intfloat/e5-large-v2",
+    model_kwargs={"device": "cpu"})  # 🔥 fix for Render, Streamlit Cloud, etc.
     vectordb = FAISS.from_documents(documents, embedding_model)
     return vectordb
 
