@@ -7,3 +7,4 @@ langchain
 langchain-community
 huggingface-hub
 python-dotenv
+beautifulsoup4
